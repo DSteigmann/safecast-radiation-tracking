@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body>
+  <h1>WebSocket Test</h1>
+  <pre id="log"></pre>
+    <script>
+    fetch('http://localhost:8080/h3-test?north=53.8&east=10.5&south=53.3&west=9.2&zoom=12')
+    .then(r => r.json())
+    .then(cells => {
+        document.body.innerHTML = `<pre>${JSON.stringify(cells, null, 2)}</pre>`;
+    })
+    .catch(err => {
+        document.body.innerHTML = `<pre>Error: ${err}</pre>`;
+    });
+    </script>
+</body>
+</html>

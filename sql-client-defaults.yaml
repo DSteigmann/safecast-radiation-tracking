@@ -1,0 +1,5 @@
+execution:
+  target: remote
+  remote:
+    host: jobmanager       
+    port: 8081

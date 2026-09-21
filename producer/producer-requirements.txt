@@ -1,0 +1,4 @@
+boto3
+flask
+gunicorn
+kafka-python==2.0.2

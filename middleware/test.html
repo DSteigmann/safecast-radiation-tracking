@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body>
+  <h1>WebSocket Test</h1>
+  <pre id="log"></pre>
+  <script>
+    const log = document.getElementById('log');
+    const ws = new WebSocket('ws://localhost:8080/testing');
+    ws.onopen = () => log.textContent += 'Connected!\n';
+    ws.onmessage = (e) => log.textContent += e.data + '\n';
+    ws.onerror = (e) => log.textContent += 'Error\n';
+  </script>
+</body>
+</html>

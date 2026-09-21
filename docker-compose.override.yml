@@ -1,0 +1,36 @@
+# LOCAL-ONLY additions. `docker compose` auto-merges this with docker-compose.yml.
+# Runs the middleware AND producer inside Docker so they reach Kafka on the
+# internal listener (kafka:9092) — the host listener advertises the AWS EC2
+# hostname, which a local host process cannot reach. Delete this file to go back
+# to the plain deployment compose.
+services:
+  middleware:
+    build: ./middleware
+    depends_on:
+      process-sql-init:
+        condition: service_completed_successfully
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_BROKERS: "kafka:9092"
+      KAFKA_TOPICS: "safecast-cells-r2,safecast-cells-r4,safecast-cells-r6,safecast-cells-r8,safecast-cells-r12"
+      PORT: "8080"
+    restart: unless-stopped
+
+  producer:
+    build: ./producer
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    environment:
+      KAFKA_BROKERS: "kafka:9092"
+      KAFKA_TOPIC: "safecast-measurements"
+      SUBMISSION_SPEED: "2000"
+      PRODUCER_LOG_PROGRESS: "true"
+    volumes:
+      # The Dockerfile does not bundle the CSV, so mount it in for local runs.
+      - ./producer/measurements-out-short.csv:/app/measurements-out-short.csv:ro
+    ports:
+      - "8042:8042"
+    # Feed the file ONCE (no restart loop) so it does not flood Kafka.
+    restart: "no"

@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Radiation Tracker</title>
+        <link rel="stylesheet" href="style.css" />
+        <!-- OpenLayers CSS -->
+        <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/ol@v8.2.0/ol.css"
+        />
+    </head>
+    <body>
+        <div id="map"></div>
+        <!-- OpenLayers JS -->
+        <script src="https://cdn.jsdelivr.net/npm/ol@v8.2.0/dist/ol.js"></script>
+        <script type="module" src="/script.js"></script>
+
+        <div id="popup" class="ol-popup">
+            <div id="popup-content"></div>
+        </div>
+
+        <!-- Hotspot notification panel, bottom-right, expands upward -->
+        <section
+            id="notifications"
+            class="notifications collapsed"
+            aria-label="Hotspot notifications"
+        >
+            <div
+                id="notifications-list"
+                class="notifications-list"
+                aria-live="polite"
+            >
+                <p class="notifications-empty">No hotspot notifications yet.</p>
+            </div>
+            <button
+                id="notifications-toggle"
+                class="notifications-header"
+                type="button"
+                aria-expanded="false"
+            >
+                <span>Notifications</span>
+                <span id="notifications-count" class="notifications-count"
+                    >0</span
+                >
+            </button>
+        </section>
+
+        <!-- Colour legend with click to open and close -->
+        <div id="legend" class="legend collapsed">
+            <button
+                id="legend-toggle"
+                class="legend-header"
+                type="button"
+                aria-expanded="false"
+            >
+                <span>Legend</span>
+                <span class="legend-caret" aria-hidden="true">▸</span>
+            </button>
+            <div id="legend-body" class="legend-body">
+                <div
+                    class="legend-tabs"
+                    role="tablist"
+                    aria-label="Map panel tabs"
+                >
+                    <button
+                        id="legend-tab-colors"
+                        class="legend-tab active"
+                        type="button"
+                        role="tab"
+                        aria-selected="true"
+                        aria-controls="legend-panel-colors"
+                    >
+                        Info
+                    </button>
+                    <button
+                        id="legend-tab-producer"
+                        class="legend-tab"
+                        type="button"
+                        role="tab"
+                        aria-selected="false"
+                        aria-controls="legend-panel-producer"
+                    >
+                        Settings
+                    </button>
+                </div>
+
+                <div
+                    id="legend-panel-colors"
+                    class="legend-panel active"
+                    role="tabpanel"
+                    aria-labelledby="legend-tab-colors"
+                >
+                    <div class="legend-row">
+                        <span
+                            class="legend-swatch"
+                            style="background: #2e7d32"
+                        ></span>
+                        <span>Safe: below 100 CPM</span>
+                    </div>
+                    <div class="legend-row">
+                        <span
+                            class="legend-swatch"
+                            style="background: #f9a825"
+                        ></span>
+                        <span>Warning: 100 to 200 CPM</span>
+                    </div>
+                    <div class="legend-row">
+                        <span
+                            class="legend-swatch"
+                            style="background: #c62828"
+                        ></span>
+                        <span>Critical: above 200 CPM</span>
+                    </div>
+                </div>
+
+                <div
+                    id="legend-panel-producer"
+                    class="legend-panel"
+                    role="tabpanel"
+                    aria-labelledby="legend-tab-producer"
+                    hidden
+                >
+                    <div class="notification-setting">
+                        <label for="notification-threshold">Notification threshold</label>
+                        <input
+                            id="notification-threshold"
+                                                        type="range"
+                                                        min="200"
+                                                        max="10000"
+                            step="1"
+                            value="200"
+                        />
+                        <input
+                            id="notification-threshold-input"
+                                                        type="number"
+                                                        min="200"
+                                                        max="10000"
+                            step="1"
+                            value="200"
+                            aria-label="Notification threshold in CPM"
+                        />
+                        <p id="notification-threshold-status" class="setting-hint">
+                            Notify at or above 200 CPM.
+                        </p>
+                    </div>
+
+                    <div class="producer-control">
+                        <label for="producer-speed">Producer speed</label>
+                        <span id="producer-sent-mb">0 MB</span>
+                    </div>
+                    <input
+                        id="producer-speed"
+                        type="range"
+                        min="0"
+                        max="1000000"
+                        step="1"
+                        value="1000"
+                    />
+                    <input
+                        id="producer-speed-input"
+                        type="number"
+                        min="0"
+                        max="1000000"
+                        step="1"
+                        value="1000"
+                        aria-label="Producer speed value"
+                    />
+                    <div class="producer-actions">
+                        <button id="producer-reset" type="button">Reset</button>
+                    </div>
+                    <p id="producer-status" class="producer-status">
+                        Producer settings not loaded yet.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </body>
+</html>

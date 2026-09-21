@@ -1,0 +1,139 @@
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_LOG4J_ROOT_LOGLEVEL: WARN
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "9094:9094"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://ec2-63-186-66-37.eu-central-1.compute.amazonaws.com:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_LOG4J_ROOT_LOGLEVEL: WARN
+      KAFKA_TOOLS_LOG4J_LOGLEVEL: ERROR
+
+  jobmanager:
+    image: flink:1.18
+    ports:
+      - "8081:8081"
+    command: jobmanager
+    environment:
+      JOB_MANAGER_RPC_ADDRESS: jobmanager
+    volumes:
+      - ./create_table.sql:/opt/flink/sql/create_table.sql
+      - ./flink-lib/flink-connector-kafka-3.1.0-1.18.jar:/opt/flink/lib/flink-connector-kafka-3.1.0-1.18.jar
+      - ./flink-lib/kafka-clients-3.5.1.jar:/opt/flink/lib/kafka-clients-3.5.1.jar
+      - ./flink-lib/h3-udf-1.0.0.jar:/opt/flink/lib/h3-udf-1.0.0.jar
+      - ./flink-log4j-console.properties:/opt/flink/conf/log4j-console.properties
+
+  taskmanager:
+    image: flink:1.18
+    depends_on:
+      - jobmanager
+    command: taskmanager
+    environment:
+      JOB_MANAGER_RPC_ADDRESS: jobmanager
+      TASK_MANAGER_NUMBER_OF_TASK_SLOTS: 3
+    volumes:
+      - ./flink-lib/flink-connector-kafka-3.1.0-1.18.jar:/opt/flink/lib/flink-connector-kafka-3.1.0-1.18.jar
+      - ./flink-lib/kafka-clients-3.5.1.jar:/opt/flink/lib/kafka-clients-3.5.1.jar
+      - ./flink-lib/h3-udf-1.0.0.jar:/opt/flink/lib/h3-udf-1.0.0.jar
+      - ./flink-log4j-console.properties:/opt/flink/conf/log4j-console.properties
+
+  #  kafka-ui:
+  #    image: provectuslabs/kafka-ui:latest
+  #    depends_on:
+  #      - kafka
+  #    ports:
+  #      - "9000:8080"
+  #    environment:
+  #      DASHBOARD_METRICS_RELOAD_INTERVAL_SECONDS: 5
+  #      KAFKA_CLUSTERS_0_NAME: local-kafka
+  #      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+
+  kafka-init:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on:
+      kafka:
+        condition: service_started
+    volumes:
+      - ./init-topics.sh:/init-topics.sh
+    command: bash /init-topics.sh
+
+  sort-sql-init:
+    image: flink:1.18
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+      jobmanager:
+        condition: service_started
+    volumes:
+      - ./flink-lib/flink-connector-kafka-3.1.0-1.18.jar:/opt/flink/lib/flink-connector-kafka-3.1.0-1.18.jar
+      - ./flink-lib/kafka-clients-3.5.1.jar:/opt/flink/lib/kafka-clients-3.5.1.jar
+      - ./flink-lib/h3-udf-1.0.0.jar:/opt/flink/lib/h3-udf-1.0.0.jar
+      - ./sort.sql:/opt/flink/sql/sort.sql
+      - ./sql-client-defaults.yaml:/opt/flink/conf/sql-client-defaults.yaml
+      - ./flink-log4j-console.properties:/opt/flink/conf/log4j-console.properties
+    command: >
+      bash -c "
+        echo 'Waiting for Jobmanager REST-Interface...';
+        while ! curl -s http://jobmanager:8081/overview >/dev/null; do sleep 1; done;
+        echo 'Waiting for Taskmanager...';
+        while [ -z \"$(curl -s http://jobmanager:8081/taskmanagers | grep '\"id\"' | head -1)\" ]; do
+          echo 'No Taskmanager registered yet, waiting...';
+          sleep 2;
+        done;
+        echo 'Taskmanager is ready. Starting sorting job...';
+        /opt/flink/bin/sql-client.sh -f /opt/flink/sql/sort.sql
+      "
+    environment:
+      FLINK_PROPERTIES: |
+        rest.address: jobmanager
+        rest.port: 8081
+      KAFKA_BROKERCONNECT: kafka:9092
+      JVM_OPTS: "-Xms64M -Xmx256M"
+
+  process-sql-init:
+    image: flink:1.18
+    depends_on:
+      sort-sql-init:
+        condition: service_completed_successfully
+      jobmanager:
+        condition: service_started
+    volumes:
+      - ./flink-lib/flink-connector-kafka-3.1.0-1.18.jar:/opt/flink/lib/flink-connector-kafka-3.1.0-1.18.jar
+      - ./flink-lib/kafka-clients-3.5.1.jar:/opt/flink/lib/kafka-clients-3.5.1.jar
+      - ./flink-lib/h3-udf-1.0.0.jar:/opt/flink/lib/h3-udf-1.0.0.jar
+      - ./process.sql:/opt/flink/sql/process.sql
+      - ./sql-client-defaults.yaml:/opt/flink/conf/sql-client-defaults.yaml
+      - ./flink-log4j-console.properties:/opt/flink/conf/log4j-console.properties
+    command: >
+      bash -c "
+        echo 'Waiting for Jobmanager REST-Interface...';
+        while ! curl -s http://jobmanager:8081/overview >/dev/null; do sleep 1; done;
+        echo 'Waiting for Taskmanager...';
+        while [ -z \"$(curl -s http://jobmanager:8081/taskmanagers | grep '\"id\"' | head -1)\" ]; do
+          echo 'No Taskmanager registered yet, waiting...';
+          sleep 2;
+        done;
+        echo 'Taskmanager is ready. Starting downstream processing job...';
+        /opt/flink/bin/sql-client.sh -f /opt/flink/sql/process.sql
+      "
+    environment:
+      FLINK_PROPERTIES: |
+        rest.address: jobmanager
+        rest.port: 8081
+      KAFKA_BROKERCONNECT: kafka:9092
+      JVM_OPTS: "-Xms64M -Xmx256M"
